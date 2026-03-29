@@ -1,0 +1,71 @@
+﻿Analyzing catalyst_app...                                       
+
+warning - Unused import: 'package:flutter/material.dart' - lib\core\router.dart:1:8 - unused_import
+   info - The imported package 'http' isn't a dependency of the importing package - lib\core\services\api_service.dart:2:8 - depend_on_referenced_packages
+  error - The getter 'values' isn't defined for the type 'List<SinglePresenceState>' - lib\features\chat\data\chat_repository.dart:61:31 - undefined_getter
+warning - Unused import: 'package:supabase_flutter/supabase_flutter.dart' - lib\features\community\data\community_repository.dart:1:8 - unused_import
+  error - Undefined name 'communityRepositoryProvider' - lib\features\community\presentation\comments_screen.dart:9:19 - undefined_identifier
+  error - Undefined name 'communityRepositoryProvider' - lib\features\community\presentation\comments_screen.dart:39:22 - undefined_identifier
+warning - The value of 'refresh' should be used - lib\features\community\presentation\comments_screen.dart:42:13 - unused_result
+  error - Target of URI doesn't exist: 'package:image_picker/image_picker.dart' - lib\features\community\presentation\community_screen.dart:6:8 - uri_does_not_exist
+  error - The named parameter 'refresh' isn't defined - lib\features\community\presentation\community_screen.dart:38:78 - undefined_named_parameter
+  error - The method 'ImagePicker' isn't defined for the type '_CreatePostBottomSheetState' - lib\features\community\presentation\community_screen.dart:74:26 - undefined_method
+  error - Undefined name 'ImageSource' - lib\features\community\presentation\community_screen.dart:74:58 - undefined_identifier
+  error - The method 'copyWith' isn't defined for the type 'Post' - lib\features\community\presentation\providers\community_provider.dart:68:33 - undefined_method
+warning - Unused import: 'package:supabase_flutter/supabase_flutter.dart' - lib\features\hackathons\data\hackathon_repository.dart:1:8 - unused_import
+warning - Unused import: 'package:catalyst_app/features/hackathons/data/hackathon_repository.dart' - lib\features\hackathons\presentation\hackathon_screen.dart:5:8 - unused_import
+warning - Unused import: 'package:catalyst_app/shared/skeletons/skeleton_box.dart' - lib\features\hackathons\presentation\hackathon_screen.dart:7:8 - unused_import
+warning - Unused import: 'package:catalyst_app/core/state/async_value_widget.dart' - lib\features\hackathons\presentation\hackathon_screen.dart:12:8 - unused_import
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\hackathons\presentation\hackathon_screen.dart:127:42 - deprecated_member_use
+warning - Unused import: 'package:catalyst_app/features/notifications/presentation/notification_screen.dart' - lib\features\home\presentation\home_shell.dart:7:8 - unused_import
+warning - The member 'state' can only be used within 'package:state_notifier/state_notifier.dart' or a test - lib\features\home\presentation\home_shell.dart:107:67 - invalid_use_of_visible_for_testing_member
+warning - The member 'state' can only be used within instance members of subclasses of 'StateNotifier' - lib\features\home\presentation\home_shell.dart:107:67 - invalid_use_of_protected_member
+warning - Unused import: 'package:supabase_flutter/supabase_flutter.dart' - lib\features\notifications\data\notification_repository.dart:1:8 - unused_import
+   info - Don't use 'BuildContext's across async gaps - lib\features\notifications\presentation\notification_screen.dart:79:31 - use_build_context_synchronously
+  error - The method 'copyWith' isn't defined for the type 'NotificationModel' - lib\features\notifications\presentation\providers\notification_provider.dart:78:46 - undefined_method
+  error - The method 'copyWith' isn't defined for the type 'NotificationModel' - lib\features\notifications\presentation\providers\notification_provider.dart:90:56 - undefined_method
+  error - The argument type 'String' can't be assigned to the parameter type 'File'.  - lib\features\profile\presentation\profile_provider.dart:54:44 - argument_type_not_assignable
+  error - Too many positional arguments: 1 expected, but 2 found - lib\features\profile\presentation\profile_provider.dart:54:63 - extra_positional_arguments
+  error - Target of URI doesn't exist: 'package:image_picker/image_picker.dart' - lib\features\profile\presentation\profile_screen.dart:4:8 - uri_does_not_exist
+  error - The method 'ImagePicker' isn't defined for the type '_ProfileScreenState' - lib\features\profile\presentation\profile_screen.dart:44:20 - undefined_method
+  error - Undefined name 'ImageSource' - lib\features\profile\presentation\profile_screen.dart:45:51 - undefined_identifier
+  error - The getter 'loading' isn't defined for the type 'AsyncValue<Profile?>' - lib\features\profile\presentation\profile_screen.dart:55:15 - undefined_getter
+  error - The getter 'data' isn't defined for the type 'AsyncValue<Profile?>' - lib\features\profile\presentation\profile_screen.dart:55:32 - undefined_getter
+  error - The getter 'data' isn't defined for the type 'AsyncValue<Profile?>' - lib\features\profile\presentation\profile_screen.dart:59:38 - undefined_getter
+  error - The getter 'data' isn't defined for the type 'AsyncValue<Profile?>' - lib\features\profile\presentation\profile_screen.dart:63:27 - undefined_getter
+  error - Invalid constant value - lib\features\profile\presentation\profile_screen.dart:315:13 - invalid_constant
+  error - Undefined name 'feature_skeletons' - lib\features\profile\presentation\profile_screen.dart:315:13 - undefined_identifier
+  error - The method 'copyWith' isn't defined for the type 'Profile' - lib\features\profile\presentation\providers\profile_provider.dart:55:39 - undefined_method
+warning - Unnecessary cast - lib\features\teams\data\matching_service.dart:12:15 - unnecessary_cast
+warning - Unnecessary cast - lib\features\teams\data\team_matching_service.dart:16:15 - unnecessary_cast
+warning - Unused import: 'package:supabase_flutter/supabase_flutter.dart' - lib\features\teams\data\team_repository.dart:1:8 - unused_import
+   info - 'value' is deprecated and shouldn't be used. Use initialValue instead. This will set the initial value for the form field. This feature was deprecated after v3.33.0-1.0.pre - lib\features\teams\presentation\create_team_screen.dart:92:15 - deprecated_member_use
+   info - 'value' is deprecated and shouldn't be used. Use initialValue instead. This will set the initial value for the form field. This feature was deprecated after v3.33.0-1.0.pre - lib\features\teams\presentation\create_team_screen.dart:99:15 - deprecated_member_use
+  error - Expected to find ')' - lib\features\teams\presentation\create_team_screen.dart:118:6 - expected_token
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\teams\presentation\join_team_screen.dart:105:41 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\teams\presentation\skill_radar_chart.dart:36:29 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\teams\presentation\skill_radar_chart.dart:41:23 - deprecated_member_use
+  error - The constructor being called isn't a const constructor - lib\main.dart:25:21 - const_with_non_const
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\shared\widgets\achievement_overlay.dart:69:48 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\shared\widgets\achievement_overlay.dart:69:80 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\shared\widgets\achievement_overlay.dart:75:56 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\shared\widgets\achievement_overlay.dart:108:78 - deprecated_member_use
+  error - The named parameter 'padding' isn't defined - lib\shared\widgets\empty_state_widget.dart:22:7 - undefined_named_parameter
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\shared\widgets\loading_overlay.dart:26:37 - deprecated_member_use
+   info - 'background' is deprecated and shouldn't be used. Use surface instead. This feature was deprecated after v3.18.0-0.1.pre - lib\theme\app_theme.dart:7:7 - deprecated_member_use
+  error - The named parameter 'caption' isn't defined - lib\theme\app_theme.dart:21:7 - undefined_named_parameter
+
+flutter : 54 issues found. (ran in 
+11.7s)
+At line:1 char:1
++ flutter analyze --no-pub > 
+analyze_final.txt 2>&1
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpe 
+   cified: (54 issues found. (ran i  
+  n 11.7s):String) [], RemoteExcep   
+ tion
+    + FullyQualifiedErrorId : Native 
+   CommandError
+ 
