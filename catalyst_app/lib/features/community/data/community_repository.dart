@@ -36,12 +36,8 @@ class CommunityRepository {
   // Voting (Business Logic Rule 17) via Python API
   Future<void> vote(String postId, bool isUpvote) async {
     try {
-      final user = _supabase.auth.currentUser;
-      if (user == null) throw AuthException('User not authenticated');
-
       await _api.post('/community/vote', {
         'post_id': postId,
-        'user_id': user.id,
         'direction': isUpvote ? 'up' : 'down',
       });
     } catch (e) {

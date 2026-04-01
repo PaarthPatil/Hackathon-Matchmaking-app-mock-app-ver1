@@ -3,17 +3,21 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:catalyst_app/models/profile_model.dart';
 import 'package:catalyst_app/core/services/supabase_service.dart';
 import 'package:catalyst_app/core/services/api_service.dart';
+import 'package:catalyst_app/core/exceptions.dart';
 
 class ProfileRepository {
-  final _supabase = SupabaseService().client;
-  final _api = ApiService();
+  final ApiService _api;
+
+  ProfileRepository({ApiService? api}) : _api = api ?? ApiService();
+
+  SupabaseClient get _supabase => SupabaseService().client;
 
   Future<Profile> fetchProfile(String userId) async {
     try {
       final data = await _supabase.from('profiles').select().eq('id', userId).single();
       return Profile.fromJson(data);
     } catch (e) {
-      throw Exception('Failed to fetch profile: $e');
+      throw NetworkException('Failed to fetch profile: $e');
     }
   }
 
@@ -22,14 +26,14 @@ class ProfileRepository {
       // RULE 17: Business logic (updates) must go through Python API
       await _api.post('/profile/update', profile.toJson());
     } catch (e) {
-      throw Exception('Failed to update profile via API: $e');
+      throw NetworkException('Failed to update profile via API: $e');
     }
   }
 
   Future<String> uploadAvatar(File file) async {
     try {
       final userId = _supabase.auth.currentUser?.id;
-      if (userId == null) throw Exception('User not authenticated');
+      if (userId == null) throw AuthException('User not authenticated');
 
       final path = '$userId/avatar_${DateTime.now().millisecondsSinceEpoch}.png';
       await _supabase.storage.from('avatars').upload(
@@ -44,8 +48,10 @@ class ProfileRepository {
       await _api.post('/profile/update_avatar', {'userId': userId, 'avatarUrl': url});
       
       return url;
+    } on CatalystException {
+      rethrow;
     } catch (e) {
-      throw Exception('Failed to upload avatar: $e');
+      throw NetworkException('Failed to upload avatar: $e');
     }
   }
 
@@ -53,7 +59,7 @@ class ProfileRepository {
     try {
       await _api.post('/profile/reward', {'user_id': userId, 'xp': xp});
     } catch (e) {
-      throw Exception('Failed to reward XP: $e');
+      throw NetworkException('Failed to reward XP: $e');
     }
   }
 }

@@ -40,7 +40,16 @@ CustomTransitionPage<T> _fadeSlideTransition<T>({
 final GoRouter router = GoRouter(
   initialLocation: '/home',
   redirect: (context, state) {
-    // PROTOTYPE MODE: Bypass authentication checks
+    final isLoggedIn = Supabase.instance.client.auth.currentSession?.user != null;
+    final authRoutes = <String>{'/login', '/register', '/otp'};
+    final isAuthRoute = authRoutes.contains(state.matchedLocation);
+
+    if (!isLoggedIn && !isAuthRoute) {
+      return '/login';
+    }
+    if (isLoggedIn && isAuthRoute) {
+      return '/home';
+    }
     return null;
   },
   routes: [

@@ -33,8 +33,7 @@ class AuthState {
 
 class AuthNotifier extends StateNotifier<AuthState> {
   final AuthRepository _repository;
-  StreamSubscription<AuthState>? _authSubscription;
-  late final StreamSubscription<AuthState> _stateSubscription;
+  StreamSubscription<dynamic>? _authSubscription;
 
   AuthNotifier(this._repository) : super(AuthState.initial()) {
     _init();
@@ -42,21 +41,16 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   void _init() {
-    // PROTOTYPE MODE: Bypass authentication checks and provide a mock user
-    state = AuthState(
-      status: AuthStatus.authenticated,
-      user: const User(
-        id: '11111111-1111-1111-1111-111111111111', // Dummy ID
-        appMetadata: {},
-        userMetadata: {},
-        aud: 'authenticated',
-        createdAt: '2024-01-01T00:00:00.000Z',
-      ),
-    );
+    final session = Supabase.instance.client.auth.currentSession;
+    if (session?.user != null) {
+      state = AuthState(status: AuthStatus.authenticated, user: session!.user);
+      return;
+    }
+    state = AuthState(status: AuthStatus.unauthenticated);
   }
 
   void _listenToAuthChanges() {
-    Supabase.instance.client.auth.onAuthStateChange.listen((data) {
+    _authSubscription = Supabase.instance.client.auth.onAuthStateChange.listen((data) {
       final event = data.event;
       final session = data.session;
 

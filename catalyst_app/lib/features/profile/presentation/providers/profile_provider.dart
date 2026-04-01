@@ -1,6 +1,5 @@
 import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:catalyst_app/models/profile_model.dart';
 import 'package:catalyst_app/features/profile/data/profile_repository.dart';
 import 'package:catalyst_app/shared/providers/achievement_provider.dart';
@@ -34,22 +33,7 @@ class ProfileNotifier extends StateNotifier<AsyncValue<Profile?>> {
   Future<void> fetchProfile(String userId) async {
     state = const AsyncValue.loading();
     try {
-      // PROTOTYPE MOCK: Fake Network Call
-      await Future.delayed(const Duration(milliseconds: 600));
-      final profile = Profile(
-        id: userId,
-        name: 'Alex Elite',
-        username: 'alex_elite',
-        bio: 'Senior Flutter Developer & System Architect. Love building cool stuff.',
-        xp: 350,
-        level: 4,
-        skills: ['Flutter', 'Dart', 'Supabase', 'Python'],
-        techStack: ['Flutter', 'Firebase', 'PostgreSQL'],
-        hackathonsJoined: 14,
-        wins: 4,
-        teamsJoined: 10,
-        avatarUrl: 'https://i.pravatar.cc/150?img=11',
-      );
+      final profile = await _repository.fetchProfile(userId);
       state = AsyncValue.data(profile);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
@@ -59,7 +43,8 @@ class ProfileNotifier extends StateNotifier<AsyncValue<Profile?>> {
   Future<void> updateProfile(Profile profile) async {
     try {
       await _repository.updateProfile(profile);
-      state = AsyncValue.data(profile);
+      final refreshed = await _repository.fetchProfile(profile.id);
+      state = AsyncValue.data(refreshed);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
     }
@@ -70,8 +55,8 @@ class ProfileNotifier extends StateNotifier<AsyncValue<Profile?>> {
        final url = await _repository.uploadAvatar(file);
        final currentProfile = state.value;
        if (currentProfile != null) {
-         final updated = currentProfile.copyWith(avatarUrl: url);
-         state = AsyncValue.data(updated);
+         final refreshed = await _repository.fetchProfile(currentProfile.id);
+         state = AsyncValue.data(refreshed.copyWith(avatarUrl: refreshed.avatarUrl ?? url));
        }
     } catch (e, st) {
        state = AsyncValue.error(e, st);
@@ -81,27 +66,19 @@ class ProfileNotifier extends StateNotifier<AsyncValue<Profile?>> {
     final current = state.value;
     if (current == null) return;
 
-    final newXp = current.xp + amount;
-    
-    // CATALYST ELITE: Progression Mastery (Phase 11)
-    // Simple logic: Level up every 100 XP
-    final int newLevel = (newXp / 100).floor() + 1;
-    final bool leveledUp = newLevel > current.level;
-
-    final updated = current.copyWith(xp: newXp, level: newLevel);
-    state = AsyncValue.data(updated);
-
     try {
       await _repository.rewardXp(current.id, amount);
+      final refreshed = await _repository.fetchProfile(current.id);
+      final bool leveledUp = refreshed.level > current.level;
+      state = AsyncValue.data(refreshed);
       
       if (leveledUp) {
         _ref.read(achievementProvider.notifier).trigger(
-          'Level $newLevel Reached!',
+          'Level ${refreshed.level} Reached!',
           'You are climbing the ranks of the elite!',
         );
       }
     } catch (e) {
-      // Rollback UI on failure
       state = AsyncValue.data(current);
     }
   }

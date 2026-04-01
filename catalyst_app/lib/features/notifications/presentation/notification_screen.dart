@@ -24,10 +24,7 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
     _scrollController.addListener(() {
       final pos = _scrollController.position;
       if (pos.pixels >= pos.maxScrollExtent * 0.8) {
-        final user = ref.read(authProvider).user;
-        if (user != null) {
-          ref.read(notificationProvider.notifier).fetchNotifications(user.id);
-        }
+        ref.read(notificationProvider.notifier).loadMore();
       }
     });
   }
@@ -52,44 +49,60 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
           ),
         ],
       ),
-      body: state.isLoading && state.notifications.isEmpty
-        ? ListView.builder(
-            itemCount: 10,
-            itemBuilder: (context, index) => const NotificationSkeleton(),
-          )
-        : state.error != null
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text('Error: ${state.error}', style: const TextStyle(color: Colors.redAccent)),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: () {
-                      final user = ref.read(authProvider).user;
-                      if (user != null) ref.read(notificationProvider.notifier).fetchNotifications(user.id);
-                    },
-                    child: const Text('Retry'),
-                  ),
-                ],
-              ),
-            )
-          : state.notifications.isEmpty
-            ? const EmptyStateWidget(
-                icon: Icons.notifications_none_outlined,
-                title: 'Nothing here yet. Come back later.', // Mandatory phrase (Rule 93)
+      body: RefreshIndicator(
+        onRefresh: () async {
+          final user = ref.read(authProvider).user;
+          if (user != null) {
+            await ref.read(notificationProvider.notifier).fetchNotifications(user.id, refresh: true);
+          }
+        },
+        child: state.isLoading && state.notifications.isEmpty
+            ? ListView.builder(
+                itemCount: 10,
+                itemBuilder: (context, index) => const NotificationSkeleton(),
               )
-            : ListView.builder(
-                controller: _scrollController,
-                itemCount: state.notifications.length,
-                itemBuilder: (context, index) {
-                  final n = state.notifications[index];
-                  return _NotificationTile(
-                    key: Key(n.id),
-                    notification: n,
-                  );
-                },
-              ),
+            : state.error != null
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text('Error: ${state.error}', style: const TextStyle(color: Colors.redAccent)),
+                        const SizedBox(height: 16),
+                        ElevatedButton(
+                          onPressed: () {
+                            final user = ref.read(authProvider).user;
+                            if (user != null) {
+                              ref.read(notificationProvider.notifier).fetchNotifications(user.id, refresh: true);
+                            }
+                          },
+                          child: const Text('Retry'),
+                        ),
+                      ],
+                    ),
+                  )
+                : state.notifications.isEmpty
+                    ? const EmptyStateWidget(
+                        icon: Icons.notifications_none_outlined,
+                        title: 'Nothing here yet. Come back later.', // Mandatory phrase (Rule 93)
+                      )
+                    : ListView.builder(
+                        controller: _scrollController,
+                        itemCount: state.notifications.length + (state.isListLoading ? 1 : 0),
+                        itemBuilder: (context, index) {
+                          if (index == state.notifications.length) {
+                            if (!state.hasMore) {
+                              return const SizedBox.shrink();
+                            }
+                            return const NotificationSkeleton();
+                          }
+                          final n = state.notifications[index];
+                          return _NotificationTile(
+                            key: Key(n.id),
+                            notification: n,
+                          );
+                        },
+                      ),
+      ),
     );
   }
 }
@@ -145,13 +158,19 @@ class _NotificationTile extends ConsumerWidget {
     switch (type) {
       case 'team_invite':
       case 'join_request':
+      case 'team_join_request':
+      case 'team_request_accepted':
+      case 'team_request_rejected':
         context.push('/chat/$referenceId'); 
         break;
       case 'like':
       case 'comment':
+      case 'post_liked':
+      case 'post_commented':
         context.push('/community/comments/$referenceId');
         break;
       case 'hackathon_reminder':
+      case 'hackathon_request_update':
         context.push('/hackathons/$referenceId');
         break;
     }
@@ -162,11 +181,19 @@ class _NotificationTile extends ConsumerWidget {
       case 'team_invite':
         return Icons.group_add;
       case 'join_request':
+      case 'team_join_request':
         return Icons.person_add_alt;
+      case 'team_request_accepted':
+        return Icons.check_circle_outline;
+      case 'team_request_rejected':
+        return Icons.cancel_outlined;
       case 'hackathon_reminder':
+      case 'hackathon_request_update':
         return Icons.event;
       case 'like':
       case 'comment':
+      case 'post_liked':
+      case 'post_commented':
         return Icons.favorite_outline;
       default:
         return Icons.notifications_none;

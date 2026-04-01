@@ -5,16 +5,24 @@ import 'package:catalyst_app/core/services/supabase_service.dart';
 import 'package:catalyst_app/core/exceptions.dart';
 
 class NotificationRepository {
-  final _supabase = SupabaseService().client;
-  final _api = ApiService();
+  final ApiService _api;
+
+  NotificationRepository({ApiService? api}) : _api = api ?? ApiService();
+
+  SupabaseClient get _supabase => SupabaseService().client;
 
   // READ via Supabase is allowed
-  Future<List<NotificationModel>> fetchNotifications(String userId) async {
+  Future<List<NotificationModel>> fetchNotifications(
+    String userId, {
+    int limit = 20,
+    int offset = 0,
+  }) async {
     try {
       final data = await _supabase
           .from('notifications')
           .select()
           .eq('user_id', userId)
+          .range(offset, offset + limit - 1)
           .order('created_at', ascending: false);
       
       return (data as List).map((json) => NotificationModel.fromJson(json)).toList();
@@ -65,12 +73,7 @@ class NotificationRepository {
   // MARK ALL AS READ (Logic Rule 17) via Python API
   Future<void> markAllAsRead() async {
     try {
-      final user = _supabase.auth.currentUser;
-      if (user == null) return;
-      
-      await _api.post('/notifications/mark_all_read', {
-        'user_id': user.id,
-      });
+      await _api.post('/notifications/mark_all_read', {});
     } catch (e) {
       throw NetworkException('Failed to update notifications');
     }
@@ -79,7 +82,11 @@ class NotificationRepository {
   // CREATE (Logic Rule 17) via Python API
   Future<void> createNotification(NotificationModel notification) async {
     try {
-      await _api.post('/notifications/create', notification.toJson());
+      await _api.post('/notifications/create', {
+        'type': notification.type,
+        'message': notification.message,
+        'reference_id': notification.referenceId,
+      });
     } catch (e) {
       throw NetworkException('Failed to send notification');
     }

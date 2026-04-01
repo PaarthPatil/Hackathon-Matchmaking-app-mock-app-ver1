@@ -67,7 +67,7 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
       body: state.isLoading 
         ? const _CommunitySkeletonList() 
         : RefreshIndicator(
-            onRefresh: () => ref.read(communityProvider.notifier).fetchPosts(),
+            onRefresh: () => ref.read(communityProvider.notifier).fetchPosts(refresh: true),
             child: state.posts.isEmpty 
               ? const EmptyStateWidget(
                   icon: Icons.forum_outlined,
@@ -79,6 +79,9 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
                   itemCount: state.posts.length + (state.isListLoading ? 1 : 0),
                   itemBuilder: (context, index) {
                     if (index == state.posts.length) {
+                      if (!state.hasMore) {
+                        return const SizedBox.shrink();
+                      }
                       return const Padding(
                         padding: EdgeInsets.symmetric(vertical: 16),
                         child: PostCardSkeleton(),

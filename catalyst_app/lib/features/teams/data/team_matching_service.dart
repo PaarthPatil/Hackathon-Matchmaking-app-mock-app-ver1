@@ -1,19 +1,33 @@
 import 'package:catalyst_app/models/team_model.dart';
-import 'package:catalyst_app/models/profile_model.dart';
 import 'package:catalyst_app/core/services/api_service.dart';
 
 class TeamMatchingService {
   final ApiService _api = ApiService();
 
-  // As per ph17: Matching logic happens on Python Backend.
-  // This Dart service acts as a client for Step 102 requirements.
-  Future<List<Team>> getMatches(Profile user) async {
+  Future<List<Team>> getMatches(String hackathonId) async {
     try {
-      // Step 6: Output Format (team_id, score, explanation) is handled 
-      // by the Team model's matching fields.
-      final data = await _api.getList('/matches?user_id=${user.id}');
-      
-      return (data as List).map((json) => Team.fromJson(json)).toList();
+      final response = await _api.post(
+        '/teams/recommendations',
+        {'hackathon_id': hackathonId},
+      );
+      if (response is! List) {
+        return [];
+      }
+      return response
+          .whereType<Map<String, dynamic>>()
+          .map(
+            (json) => Team(
+              id: json['team_id'] as String,
+              hackathonId: hackathonId,
+              creatorId: '',
+              name: json['team_name'] as String?,
+              requiredSkills: const [],
+              membersCount: (json['members_count'] as num?)?.toInt() ?? 0,
+              matchingScore: ((json['compatibility_score'] as num?)?.toDouble() ?? 0) / 100.0,
+              matchingExplanation: json['explanation'] as String?,
+            ),
+          )
+          .toList();
     } catch (e) {
       rethrow;
     }

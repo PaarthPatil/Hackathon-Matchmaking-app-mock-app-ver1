@@ -2,13 +2,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:catalyst_app/models/post_model.dart';
 import 'package:catalyst_app/models/comment_model.dart';
 import 'package:catalyst_app/features/community/data/community_repository.dart';
-import 'package:catalyst_app/models/profile_model.dart';
-import 'package:catalyst_app/features/profile/presentation/providers/profile_provider.dart';
 
 class CommunityState {
+  static const Object _noErrorChange = Object();
   final List<Post> posts;
   final bool isLoading;
   final bool isListLoading;
+  final bool hasMore;
   final Set<String> votedPostIds;
   final String? error;
 
@@ -16,6 +16,7 @@ class CommunityState {
     required this.posts,
     this.isLoading = false,
     this.isListLoading = false,
+    this.hasMore = true,
     this.votedPostIds = const {},
     this.error,
   });
@@ -26,61 +27,55 @@ class CommunityState {
     List<Post>? posts,
     bool? isLoading,
     bool? isListLoading,
+    bool? hasMore,
     Set<String>? votedPostIds,
-    String? error,
+    Object? error = _noErrorChange,
   }) {
     return CommunityState(
       posts: posts ?? this.posts,
       isLoading: isLoading ?? this.isLoading,
       isListLoading: isListLoading ?? this.isListLoading,
+      hasMore: hasMore ?? this.hasMore,
       votedPostIds: votedPostIds ?? this.votedPostIds,
-      error: error ?? this.error,
+      error: identical(error, _noErrorChange) ? this.error : error as String?,
     );
   }
 }
 
 class CommunityNotifier extends StateNotifier<CommunityState> {
   final CommunityRepository _repository;
-  final Ref _ref;
+  static const int _pageSize = 20;
 
-  CommunityNotifier(this._repository, this._ref) : super(CommunityState.initial()) {
+  CommunityNotifier(this._repository) : super(CommunityState.initial()) {
     fetchPosts();
   }
 
-  Future<void> fetchPosts({int limit = 20, int offset = 0, bool refresh = false}) async {
+  Future<void> fetchPosts({int limit = _pageSize, int offset = 0, bool refresh = false}) async {
     if (refresh) {
-      state = state.copyWith(isLoading: true, error: null);
+      state = state.copyWith(isLoading: true, error: null, hasMore: true);
     } else {
       state = state.copyWith(isListLoading: true, error: null);
     }
 
     try {
-      // PROTOTYPE MOCK
-      await Future.delayed(const Duration(milliseconds: 600));
-      final posts = List.generate(100, (index) {
-        final profileId = 'user-${index + 1}';
-        return Post(
-          id: 'post-$index',
-          userId: profileId,
-          content: 'Iteration $index: Building the future of Catalyst with intelligent hackathon matching. Anyone need a co-founder? #hackathon #catalyst',
-          upvotes: 42 + index * 5,
-          downvotes: index % 3,
-          createdAt: DateTime.now().subtract(Duration(hours: index)),
-          author: Profile(
-             id: profileId,
-             name: 'Elite Hacker $index',
-             username: 'hacker_$index',
-             avatarUrl: 'https://i.pravatar.cc/150?u=$profileId',
-             xp: index * 100 + 50,
-             level: (index % 10) + 1,
-          ),
+      final posts = await _repository.fetchPosts(limit: limit, offset: offset);
+      if (refresh || offset == 0) {
+        state = state.copyWith(
+          posts: posts,
+          isLoading: false,
+          isListLoading: false,
+          hasMore: posts.length >= limit,
+          votedPostIds: {},
+          error: null,
         );
-      });
-      if (refresh || state.posts.isEmpty) {
-        state = state.copyWith(posts: posts, isLoading: false);
       } else {
-        // Just return to avoid eternal lists
-        state = state.copyWith(isListLoading: false);
+        state = state.copyWith(
+          posts: [...state.posts, ...posts],
+          isLoading: false,
+          isListLoading: false,
+          hasMore: posts.length >= limit,
+          error: null,
+        );
       }
     } catch (e) {
       state = state.copyWith(isLoading: false, isListLoading: false, error: e.toString());
@@ -88,21 +83,17 @@ class CommunityNotifier extends StateNotifier<CommunityState> {
   }
 
   Future<void> loadMore() async {
-    if (state.isListLoading) return;
-    await fetchPosts(offset: state.posts.length);
+    if (state.isListLoading || !state.hasMore) return;
+    await fetchPosts(offset: state.posts.length, limit: _pageSize);
   }
 
   Future<void> createPost(Post post) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
-      // PROTOTYPE MOCK
-      await Future.delayed(const Duration(milliseconds: 600));
-      
-      // CATALYST ELITE: Gamification Loop (Rule 74)
-      await _ref.read(profileProvider.notifier).rewardXp(10);
+      await _repository.createPost(post);
       
       state = state.copyWith(isLoading: false);
-      fetchPosts(refresh: true); // Fully refresh list (Rule 93)
+      await fetchPosts(refresh: true); // Fully refresh list (Rule 93)
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());
       rethrow;
@@ -133,41 +124,28 @@ class CommunityNotifier extends StateNotifier<CommunityState> {
     );
 
     try {
-      // PROTOTYPE MOCK
-      await Future.delayed(const Duration(milliseconds: 100));
-
-      
-      // CATALYST ELITE: Gamification (Rule 75)
-      // Small XP reward for active voting
-      await _ref.read(profileProvider.notifier).rewardXp(2);
+      await _repository.vote(postId, isUpvote);
     } catch (e) {
       // Rollback on failure
-      state = state.copyWith(posts: originalPosts, error: 'Vote failed: $e');
+      state = state.copyWith(
+        posts: originalPosts,
+        votedPostIds: Set<String>.from(state.votedPostIds)..remove(postId),
+        error: 'Vote failed: $e',
+      );
     }
   }
 
   Future<List<Comment>> fetchComments(String postId) async {
-    // PROTOTYPE MOCK
-    await Future.delayed(const Duration(milliseconds: 300));
-    return [
-      Comment(
-        id: 'c1',
-        postId: postId,
-        userId: 'user-2',
-        content: 'I completely agree! Amazing.',
-        createdAt: DateTime.now(),
-      )
-    ];
+    return _repository.fetchComments(postId);
   }
 
   Future<void> createComment(Comment comment) async {
-    // PROTOTYPE MOCK
-    await Future.delayed(const Duration(milliseconds: 300));
+    await _repository.createComment(comment);
   }
 }
 
 final communityRepositoryProvider = Provider((ref) => CommunityRepository());
 
 final communityProvider = StateNotifierProvider<CommunityNotifier, CommunityState>((ref) {
-  return CommunityNotifier(ref.read(communityRepositoryProvider), ref);
+  return CommunityNotifier(ref.read(communityRepositoryProvider));
 });
