@@ -3,13 +3,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:catalyst_app/models/profile_model.dart';
+import 'package:catalyst_app/features/auth/presentation/providers/auth_provider.dart';
 import 'package:catalyst_app/features/profile/presentation/providers/profile_provider.dart';
 import 'package:catalyst_app/features/teams/presentation/providers/team_provider.dart';
 import 'package:catalyst_app/shared/skeletons/feature_skeletons.dart';
 import 'package:catalyst_app/models/team_model.dart';
+import 'package:catalyst_app/core/state/theme_provider.dart';
 import 'package:go_router/go_router.dart';
 
-final userTeamsProvider = FutureProvider.family<List<Team>, String>((ref, userId) {
+final userTeamsProvider = FutureProvider.family<List<Team>, String>((
+  ref,
+  userId,
+) {
   return ref.read(teamRepositoryProvider).fetchUserTeams(userId);
 });
 
@@ -34,6 +39,18 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     _bioController = TextEditingController();
   }
 
+  IconData _getThemeIcon(WidgetRef ref) {
+    final mode = ref.watch(themeModeProvider);
+    switch (mode) {
+      case ThemeMode.light:
+        return Icons.light_mode;
+      case ThemeMode.dark:
+        return Icons.dark_mode;
+      case ThemeMode.system:
+        return Icons.brightness_auto;
+    }
+  }
+
   void _setupControllers(Profile profile) {
     _nameController.text = profile.name ?? '';
     _usernameController.text = profile.username ?? '';
@@ -51,24 +68,111 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(profileProvider);
+    final authState = ref.watch(authProvider);
+
+    if (authState.status != AuthStatus.authenticated) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Profile')),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.lock_outline, size: 72, color: Colors.grey),
+              const SizedBox(height: 16),
+              const Text('Please sign in to view your profile.'),
+              const SizedBox(height: 24),
+              ElevatedButton(
+                onPressed: () => context.push('/login'),
+                child: const Text('Sign In'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
     if (state.isLoading && state.value == null) {
       return const _ProfileSkeletonWrapper();
     }
 
     if (state.hasError && state.value == null) {
-      return Scaffold(body: Center(child: Text('Error: ${state.error}')));
+      return Scaffold(
+        appBar: AppBar(title: const Text('Profile')),
+        body: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(
+                Icons.error_outline,
+                size: 68,
+                color: Colors.redAccent,
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Unable to load profile',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                state.error.toString(),
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.grey),
+              ),
+              const SizedBox(height: 24),
+              if (authState.status == AuthStatus.authenticated)
+                ElevatedButton(
+                  onPressed: () => ref
+                      .read(profileProvider.notifier)
+                      .fetchProfile(authState.userId),
+                  child: const Text('Retry'),
+                ),
+              if (authState.status != AuthStatus.authenticated)
+                ElevatedButton(
+                  onPressed: () => context.push('/login'),
+                  child: const Text('Sign In'),
+                ),
+            ],
+          ),
+        ),
+      );
     }
 
     final profile = state.value;
     if (profile == null) {
-      return const Scaffold(body: Center(child: Text('Please login to view profile')));
+      return Scaffold(
+        appBar: AppBar(title: const Text('Profile')),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.person_outline, size: 72, color: Colors.grey),
+              const SizedBox(height: 16),
+              const Text(
+                'No profile data available.',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              const Text('Sign in or register to view and edit your profile.'),
+              const SizedBox(height: 24),
+              ElevatedButton(
+                onPressed: () => context.push('/login'),
+                child: const Text('Sign In'),
+              ),
+            ],
+          ),
+        ),
+      );
     }
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Profile'),
         actions: [
+          IconButton(
+            icon: Icon(_getThemeIcon(ref)),
+            onPressed: () => ref.read(themeModeProvider.notifier).toggleTheme(),
+          ),
           IconButton(
             icon: Icon(isEditing ? Icons.save : Icons.edit),
             onPressed: () {
@@ -104,6 +208,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           const Divider(),
           _buildPreferences(profile),
           const Divider(),
+          if (profile.roles.contains('admin')) ...[
+            _buildAdminDashboardButton(context),
+            const Divider(),
+          ],
           _buildMyTeams(profile.id),
         ],
       ),
@@ -143,8 +251,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           children: [
             CircleAvatar(
               radius: 50,
-              backgroundImage: profile.avatarUrl != null ? NetworkImage(profile.avatarUrl!) : null,
-              child: profile.avatarUrl == null ? const Icon(Icons.person, size: 50) : null,
+              backgroundImage: profile.avatarUrl != null
+                  ? NetworkImage(profile.avatarUrl!)
+                  : null,
+              child: profile.avatarUrl == null
+                  ? const Icon(Icons.person, size: 50)
+                  : null,
             ),
             if (isEditing)
               Positioned(
@@ -163,12 +275,27 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         ),
         const SizedBox(height: 16),
         if (isEditing) ...[
-          TextField(controller: _nameController, decoration: const InputDecoration(labelText: 'Name')),
-          TextField(controller: _usernameController, decoration: const InputDecoration(labelText: 'Username')),
-          TextField(controller: _bioController, decoration: const InputDecoration(labelText: 'Bio')),
+          TextField(
+            controller: _nameController,
+            decoration: const InputDecoration(labelText: 'Name'),
+          ),
+          TextField(
+            controller: _usernameController,
+            decoration: const InputDecoration(labelText: 'Username'),
+          ),
+          TextField(
+            controller: _bioController,
+            decoration: const InputDecoration(labelText: 'Bio'),
+          ),
         ] else ...[
-          Text(profile.name ?? 'No Name', style: Theme.of(context).textTheme.headlineLarge),
-          Text('@${profile.username ?? 'no_username'}', style: Theme.of(context).textTheme.bodyLarge),
+          Text(
+            profile.name ?? 'No Name',
+            style: Theme.of(context).textTheme.headlineLarge,
+          ),
+          Text(
+            '@${profile.username ?? 'no_username'}',
+            style: Theme.of(context).textTheme.bodyLarge,
+          ),
           const SizedBox(height: 8),
           Text(profile.bio ?? 'No bio yet', textAlign: TextAlign.center),
           const SizedBox(height: 16),
@@ -181,14 +308,23 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   Widget _buildXpBar(Profile profile) {
     const double xpPerLevel = 100.0;
     final double progress = (profile.xp % xpPerLevel) / xpPerLevel;
-    
+
     return Column(
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text('Level ${profile.level}', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
-            Text('${(profile.xp % xpPerLevel).toInt()} / ${xpPerLevel.toInt()} XP', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+            Text(
+              'Level ${profile.level}',
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Colors.blue,
+              ),
+            ),
+            Text(
+              '${(profile.xp % xpPerLevel).toInt()} / ${xpPerLevel.toInt()} XP',
+              style: const TextStyle(fontSize: 12, color: Colors.grey),
+            ),
           ],
         ),
         const SizedBox(height: 8),
@@ -211,10 +347,17 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       children: [
         Text('Skills', style: Theme.of(context).textTheme.headlineSmall),
         const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          children: profile.skills.map((s) => Chip(label: Text(s))).toList(),
-        ),
+        profile.skills.isEmpty
+            ? const Text(
+                'No skills added yet.',
+                style: TextStyle(color: Colors.grey),
+              )
+            : Wrap(
+                spacing: 8,
+                children: profile.skills
+                    .map((s) => Chip(label: Text(s)))
+                    .toList(),
+              ),
       ],
     );
   }
@@ -225,21 +368,54 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       children: [
         Text('Tech Stack', style: Theme.of(context).textTheme.headlineSmall),
         const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          children: profile.techStack.map((t) => Chip(label: Text(t))).toList(),
-        ),
+        profile.techStack.isEmpty
+            ? const Text(
+                'No tech stack information yet.',
+                style: TextStyle(color: Colors.grey),
+              )
+            : Wrap(
+                spacing: 8,
+                children: profile.techStack
+                    .map((t) => Chip(label: Text(t)))
+                    .toList(),
+              ),
       ],
     );
   }
 
   Widget _buildLinks(Profile profile) {
+    final hasLinks =
+        profile.githubLink.isNotEmpty ||
+        profile.linkedinLink.isNotEmpty ||
+        profile.portfolioLink.isNotEmpty;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text('Links', style: Theme.of(context).textTheme.headlineSmall),
-        ListTile(leading: const Icon(Icons.link), title: Text('GitHub: ${profile.githubLink.join(", ")}')),
-        ListTile(leading: const Icon(Icons.link), title: Text('LinkedIn: ${profile.linkedinLink.join(", ")}')),
+        const SizedBox(height: 8),
+        if (!hasLinks)
+          const Text(
+            'No links added yet.',
+            style: TextStyle(color: Colors.grey),
+          )
+        else ...[
+          if (profile.githubLink.isNotEmpty)
+            ListTile(
+              leading: const Icon(Icons.link),
+              title: Text('GitHub: ${profile.githubLink.join(", ")}'),
+            ),
+          if (profile.linkedinLink.isNotEmpty)
+            ListTile(
+              leading: const Icon(Icons.link),
+              title: Text('LinkedIn: ${profile.linkedinLink.join(", ")}'),
+            ),
+          if (profile.portfolioLink.isNotEmpty)
+            ListTile(
+              leading: const Icon(Icons.link),
+              title: Text('Portfolio: ${profile.portfolioLink.join(", ")}'),
+            ),
+        ],
       ],
     );
   }
@@ -247,7 +423,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   Widget _statItem(String label, String value) {
     return Column(
       children: [
-        Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+        Text(
+          value,
+          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+        ),
         Text(label),
       ],
     );
@@ -273,9 +452,16 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, crossAxisSpacing: 8, mainAxisSpacing: 8),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 3,
+            crossAxisSpacing: 8,
+            mainAxisSpacing: 8,
+          ),
           itemCount: 3,
-          itemBuilder: (context, index) => Container(color: Colors.grey[800], child: const Icon(Icons.emoji_events)),
+          itemBuilder: (context, index) => Container(
+            color: Colors.grey[800],
+            child: const Icon(Icons.emoji_events),
+          ),
         ),
       ],
     );
@@ -291,7 +477,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           value: profile.lookingForTeam,
           onChanged: (val) {},
         ),
-        ListTile(title: const Text('Availability'), subtitle: Text(profile.availability)),
+        ListTile(
+          title: const Text('Availability'),
+          subtitle: Text(profile.availability),
+        ),
       ],
     );
   }
@@ -327,11 +516,25 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           },
           loading: () => const Padding(
             padding: EdgeInsets.symmetric(vertical: 20),
-            child: NotificationSkeleton(), // Reusing notification skeleton for list item shimmer
+            child:
+                NotificationSkeleton(), // Reusing notification skeleton for list item shimmer
           ),
           error: (e, st) => Text('Error loading teams: $e'),
         ),
       ],
+    );
+  }
+
+  Widget _buildAdminDashboardButton(BuildContext context) {
+    return ListTile(
+      leading: const Icon(Icons.admin_panel_settings, color: Colors.amber),
+      title: const Text(
+        'Admin Dashboard',
+        style: TextStyle(color: Colors.amber, fontWeight: FontWeight.bold),
+      ),
+      subtitle: const Text('Review hackathon requests and manage events'),
+      trailing: const Icon(Icons.chevron_right, color: Colors.amber),
+      onTap: () => context.push('/admin'),
     );
   }
 }

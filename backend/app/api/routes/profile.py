@@ -15,6 +15,11 @@ def profile_health():
     return {"status": "ok"}
 
 
+@router.get("/me")
+def get_my_profile(current_user: dict = Depends(get_current_user)):
+    return profile_service.get_profile(user_id=current_user["user_id"])
+
+
 @router.post("/complete")
 def mark_profile_completed(current_user: dict = Depends(get_current_user)):
     result = gamification_service.award_profile_completion_xp(user_id=current_user["user_id"])

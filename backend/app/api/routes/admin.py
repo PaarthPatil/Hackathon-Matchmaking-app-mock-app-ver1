@@ -2,16 +2,24 @@ from fastapi import APIRouter, Depends, Query
 from uuid import UUID
 
 from app.core.dependencies import get_current_admin
+from app.schemas.admin import (
+    AdminCreateTeamRequest,
+    AdminCreateUserRequest,
+    AdminSeedMockDataRequest,
+    AdminTriggerEventsRequest,
+)
 from app.schemas.hackathon import (
     ApproveHackathonRequest,
     CreateHackathonRequest,
     RejectHackathonRequest,
     UpdateHackathonRequest,
 )
+from app.services.admin_control_service import AdminControlService
 from app.services.admin_hackathon_service import AdminHackathonService
 
 router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(get_current_admin)])
 admin_hackathon_service = AdminHackathonService()
+admin_control_service = AdminControlService()
 
 
 @router.get("/health")
@@ -51,3 +59,39 @@ def update_hackathon(hackathon_id: UUID, payload: UpdateHackathonRequest):
 @router.delete("/hackathons/{hackathon_id}")
 def delete_hackathon(hackathon_id: UUID):
     return admin_hackathon_service.delete_hackathon(hackathon_id=str(hackathon_id))
+
+
+@router.get("/users")
+def list_users(
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+):
+    return admin_control_service.list_users(limit=limit, offset=offset)
+
+
+@router.post("/users/create")
+def create_user(payload: AdminCreateUserRequest):
+    return admin_control_service.create_user(payload=payload)
+
+
+@router.post("/teams/create")
+def create_team(payload: AdminCreateTeamRequest):
+    return admin_control_service.create_team(payload=payload)
+
+
+@router.get("/catalog")
+def get_admin_catalog():
+    return admin_control_service.get_admin_catalog()
+
+
+@router.post("/testing/seed")
+def seed_mock_data(payload: AdminSeedMockDataRequest):
+    return admin_control_service.seed_mock_data(payload=payload)
+
+
+@router.post("/testing/trigger-events")
+def trigger_events(payload: AdminTriggerEventsRequest, current_admin: dict = Depends(get_current_admin)):
+    return admin_control_service.trigger_test_events(
+        admin_user_id=current_admin["user_id"],
+        payload=payload,
+    )

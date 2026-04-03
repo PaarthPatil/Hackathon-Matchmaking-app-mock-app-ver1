@@ -145,6 +145,7 @@ class _NotificationTile extends ConsumerWidget {
             if (!notification.read) {
               await ref.read(notificationProvider.notifier).markAsRead(notification.id);
             }
+            if (!context.mounted) return;
             if (notification.referenceId != null) {
               _handleNavigation(context, notification.type, notification.referenceId!);
             }

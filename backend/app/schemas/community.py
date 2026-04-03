@@ -71,6 +71,51 @@ class CreateCommentRequest(BaseModel):
         return cleaned
 
 
+class UpdatePostRequest(BaseModel):
+    content: str | None = Field(default=None, min_length=1, max_length=5000)
+    image_url: str | None = Field(default=None, max_length=2000)
+
+    @field_validator("content", mode="before")
+    @classmethod
+    def validate_content(cls, value: Any) -> str | None:
+        if value is None:
+            return None
+        if not isinstance(value, str):
+            raise ValueError("content must be a string.")
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("content must not be empty.")
+        return cleaned
+
+    @field_validator("image_url", mode="before")
+    @classmethod
+    def validate_image_url(cls, value: Any) -> str | None:
+        if value is None:
+            return None
+        if not isinstance(value, str):
+            raise ValueError("image_url must be a string.")
+        cleaned = value.strip()
+        if not cleaned:
+            return None
+        if not (cleaned.startswith("http://") or cleaned.startswith("https://")):
+            raise ValueError("image_url must be a valid http(s) URL.")
+        return cleaned
+
+
+class UpdateCommentRequest(BaseModel):
+    content: str = Field(min_length=1, max_length=2000)
+
+    @field_validator("content", mode="before")
+    @classmethod
+    def validate_content(cls, value: Any) -> str:
+        if not isinstance(value, str):
+            raise ValueError("content is required.")
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("content must not be empty.")
+        return cleaned
+
+
 class CommunityFeedItem(BaseModel):
     id: str
     user_id: str

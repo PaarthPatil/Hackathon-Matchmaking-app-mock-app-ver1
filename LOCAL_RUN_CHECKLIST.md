@@ -7,6 +7,7 @@ Run these in order:
 2. `backend/sql/001_hackathon_requests.sql`
 3. `backend/sql/002_social_layer.sql`
 4. `backend/sql/003_backend_hardening.sql`
+5. `backend/sql/004_admin_role_support.sql`
 
 ## 2. Backend Environment
 Create `backend/.env` with at least:
@@ -33,24 +34,24 @@ pip install -r backend/requirements-dev.txt
 
 ```bash
 cd backend
-uvicorn app.main:app --reload
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8001
 ```
 
-Backend base URL: `http://127.0.0.1:8000`
+Backend base URL: `http://127.0.0.1:8001`
 
 ## 5. Run Backend Validation
 
 ```bash
 python -m compileall backend/app
 python -m pytest -q backend/tests
-python backend/scripts/smoke_check.py --base-url http://127.0.0.1:8000
+python backend/scripts/smoke_check.py --base-url http://127.0.0.1:8001
 ```
 
 For full auth smoke checks, include tokens:
 
 ```bash
 python backend/scripts/smoke_check.py \
-  --base-url http://127.0.0.1:8000 \
+  --base-url http://127.0.0.1:8001 \
   --user-token "<USER_JWT>" \
   --admin-token "<ADMIN_JWT>" \
   --strict-auth
@@ -75,6 +76,19 @@ flutter run
 The app calls FastAPI at:
 
 - `catalyst_app/lib/core/constants/api_constants.dart`
-  - `pythonBaseUrl = http://localhost:8000/api/v1`
+  - `pythonBaseUrl` from `--dart-define=PYTHON_API_BASE_URL=...`
 
-If using an emulator/device that cannot reach localhost, change this base URL accordingly (for example host machine LAN IP).
+The app initializes Supabase from:
+
+- `--dart-define=SUPABASE_URL=...`
+- `--dart-define=SUPABASE_ANON_KEY=...`
+
+Example:
+
+```bash
+flutter run \
+  --dart-define=PYTHON_API_BASE_URL=http://192.168.6.107:8001/api/v1 \
+  --dart-define=SUPABASE_URL=https://your-project.supabase.co \
+  --dart-define=SUPABASE_ANON_KEY=your-anon-key
+```
+.

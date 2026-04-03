@@ -160,6 +160,59 @@ class TeamService:
             "message": "Join request submitted.",
         }
 
+    def list_user_teams(self, user_id: str, hackathon_id: str | None = None) -> list[dict]:
+        query = (
+            supabase.table("team_members")
+            .select(
+                "team_id, status, teams!inner(id,hackathon_id,creator_id,name,description,required_skills,max_members,commitment_level,availability,created_at)"
+            )
+            .eq("user_id", user_id)
+            .eq("status", "accepted")
+        )
+        if hackathon_id:
+            query = query.eq("teams.hackathon_id", hackathon_id)
+
+        memberships = query.execute().data or []
+        if not memberships:
+            return []
+
+        teams: list[dict] = []
+        team_ids: list[str] = []
+        for row in memberships:
+            team = row.get("teams")
+            if not isinstance(team, dict):
+                continue
+            team_id = str(team.get("id"))
+            if not team_id:
+                continue
+            team_ids.append(team_id)
+            teams.append(team)
+
+        if not team_ids:
+            return []
+
+        accepted_member_rows = (
+            supabase.table("team_members")
+            .select("team_id")
+            .in_("team_id", team_ids)
+            .eq("status", "accepted")
+            .execute()
+            .data
+            or []
+        )
+        counts: dict[str, int] = {}
+        for row in accepted_member_rows:
+            tid = str(row.get("team_id"))
+            if not tid:
+                continue
+            counts[tid] = counts.get(tid, 0) + 1
+
+        normalized: list[dict] = []
+        for team in teams:
+            team_id = str(team.get("id"))
+            normalized.append({**team, "members_count": counts.get(team_id, 0)})
+        return normalized
+
     def accept_request(self, requester_user_id: str, team_member_id: str) -> dict:
         membership = self._get_membership_record(team_member_id)
         if membership.get("status") != "pending":

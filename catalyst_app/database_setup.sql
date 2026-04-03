@@ -19,6 +19,8 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   github TEXT,
   linkedin TEXT,
   portfolio TEXT,
+  role TEXT DEFAULT 'user',
+  roles JSONB DEFAULT '["user"]',
   xp INTEGER DEFAULT 0,
   level INTEGER DEFAULT 1,
   looking_for_team BOOLEAN DEFAULT TRUE,

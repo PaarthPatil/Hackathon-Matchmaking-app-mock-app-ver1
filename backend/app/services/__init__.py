@@ -1,4 +1,5 @@
 from .admin_hackathon_service import AdminHackathonService
+from .admin_control_service import AdminControlService
 from .chat_service import ChatService
 from .community_service import CommunityService
 from .gamification_service import GamificationService
@@ -14,6 +15,7 @@ __all__ = [
     "ChatService",
     "HackathonService",
     "AdminHackathonService",
+    "AdminControlService",
     "CommunityService",
     "NotificationService",
     "GamificationService",

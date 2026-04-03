@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:catalyst_app/models/hackathon_model.dart';
-import 'package:catalyst_app/features/hackathons/data/hackathon_repository.dart';
 
-import 'package:catalyst_app/shared/skeletons/skeleton_box.dart';
+
+
 import 'package:catalyst_app/shared/widgets/empty_state_widget.dart';
 
 import 'package:catalyst_app/features/hackathons/presentation/providers/hackathon_provider.dart';

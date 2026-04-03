@@ -38,10 +38,18 @@ class TeamNotifier extends StateNotifier<TeamState> {
 
   TeamNotifier(this._repository, this._matchingService, this._ref) : super(TeamState.initial());
 
-  Future<void> fetchRecommendations(String userId, String hackathonId) async {
+  Future<void> fetchRecommendations(
+    String userId,
+    String hackathonId, {
+    bool forceRefresh = false,
+  }) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
-      final teams = await _matchingService.fetchRecommendedTeams(userId, hackathonId);
+      final teams = await _matchingService.fetchRecommendedTeams(
+        userId,
+        hackathonId,
+        forceRefresh: forceRefresh,
+      );
       state = state.copyWith(
         recommendedTeams: teams,
         isLoading: false,
@@ -88,8 +96,11 @@ final matchingServiceProvider = Provider((ref) => MatchingService());
 
 final userTeamProvider = FutureProvider.family<String?, String>((ref, hackathonId) async {
   final authState = ref.watch(authProvider);
-  final userId = authState.user?.id;
-  if (userId == null) {
+  if (authState.status != AuthStatus.authenticated) {
+    return null;
+  }
+  final userId = authState.userId;
+  if (userId.isEmpty) {
     return null;
   }
   final teams = await ref.read(teamRepositoryProvider).fetchUserTeams(userId);

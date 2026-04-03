@@ -4,11 +4,18 @@ import 'package:catalyst_app/core/services/api_service.dart';
 class MatchingService {
   final _api = ApiService();
 
-  Future<List<Team>> fetchRecommendedTeams(String _, String hackathonId) async {
+  Future<List<Team>> fetchRecommendedTeams(
+    String _,
+    String hackathonId, {
+    bool forceRefresh = false,
+  }) async {
     try {
       final response = await _api.post(
         '/teams/recommendations',
-        {'hackathon_id': hackathonId},
+        {
+          'hackathon_id': hackathonId,
+          'force_refresh': forceRefresh,
+        },
       );
       if (response is! List) {
         return [];

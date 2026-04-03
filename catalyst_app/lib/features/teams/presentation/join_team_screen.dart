@@ -20,14 +20,23 @@ class JoinTeamScreen extends ConsumerStatefulWidget {
 }
 
 class _JoinTeamScreenState extends ConsumerState<JoinTeamScreen> {
+  Future<void> _fetchRecommendations({bool forceRefresh = false}) async {
+    final user = ref.read(authProvider).user;
+    if (user == null) {
+      return;
+    }
+    await ref.read(teamProvider.notifier).fetchRecommendations(
+          user.id,
+          widget.hackathonId,
+          forceRefresh: forceRefresh,
+        );
+  }
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final user = ref.read(authProvider).user;
-      if (user != null) {
-        ref.read(teamProvider.notifier).fetchRecommendations(user.id, widget.hackathonId);
-      }
+      _fetchRecommendations();
     });
   }
 
@@ -39,45 +48,65 @@ class _JoinTeamScreenState extends ConsumerState<JoinTeamScreen> {
       isLoading: state.isLoading && state.recommendedTeams.isNotEmpty,
       message: 'Processing...',
       child: Scaffold(
-        appBar: AppBar(title: const Text('Recommended Teams')),
+        appBar: AppBar(
+          title: const Text('Recommended Teams'),
+          actions: [
+            IconButton(
+              tooltip: 'Refresh Teams',
+              icon: const Icon(Icons.refresh),
+              onPressed: () => _fetchRecommendations(forceRefresh: true),
+            ),
+          ],
+        ),
         body: state.isLoading && state.recommendedTeams.isEmpty
-          ? ListView.builder(
-              itemCount: 5,
-              padding: const EdgeInsets.all(16),
-              itemBuilder: (context, index) => const HackathonCardSkeleton(),
-            )
-          : state.error != null
-            ? Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text('Error: ${state.error}', style: const TextStyle(color: Colors.redAccent)),
-                    const SizedBox(height: 16),
-                    ElevatedButton(
-                      onPressed: () {
-                        final user = ref.read(authProvider).user;
-                        if (user != null) {
-                          ref.read(teamProvider.notifier).fetchRecommendations(user.id, widget.hackathonId);
-                        }
-                      },
-                      child: const Text('Retry'),
-                    ),
-                  ],
-                ),
+            ? ListView.builder(
+                itemCount: 5,
+                padding: const EdgeInsets.all(16),
+                itemBuilder: (context, index) => const HackathonCardSkeleton(),
               )
-            : state.recommendedTeams.isEmpty
-              ? const EmptyStateWidget(
-                  icon: Icons.people_outline,
-                  title: 'No Teams Found',
-                )
-              : ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: state.recommendedTeams.length,
-                  itemBuilder: (context, index) {
-                    final team = state.recommendedTeams[index];
-                    return _MatchCard(team: team);
-                  },
-                ),
+            : state.error != null
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text('Error: ${state.error}', style: const TextStyle(color: Colors.redAccent)),
+                        const SizedBox(height: 16),
+                        ElevatedButton(
+                          onPressed: () => _fetchRecommendations(forceRefresh: true),
+                          child: const Text('Retry'),
+                        ),
+                      ],
+                    ),
+                  )
+                : state.recommendedTeams.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const EmptyStateWidget(
+                              icon: Icons.people_outline,
+                              title: 'No Teams Found',
+                            ),
+                            const SizedBox(height: 12),
+                            ElevatedButton.icon(
+                              onPressed: () => _fetchRecommendations(forceRefresh: true),
+                              icon: const Icon(Icons.refresh),
+                              label: const Text('Refresh Teams'),
+                            ),
+                          ],
+                        ),
+                      )
+                    : RefreshIndicator(
+                        onRefresh: () => _fetchRecommendations(forceRefresh: true),
+                        child: ListView.builder(
+                          padding: const EdgeInsets.all(16),
+                          itemCount: state.recommendedTeams.length,
+                          itemBuilder: (context, index) {
+                            final team = state.recommendedTeams[index];
+                            return _MatchCard(team: team);
+                          },
+                        ),
+                      ),
       ),
     );
   }
@@ -147,7 +176,7 @@ class _MatchCard extends ConsumerWidget {
               ],
             ),
             const SizedBox(height: 8),
-            Text('${team.membersCount} members • ${team.maxMembers ?? 'N/A'} max',
+            Text('${team.membersCount} members | ${team.maxMembers ?? 'N/A'} max',
                 style: const TextStyle(color: Colors.grey)),
             const SizedBox(height: 12),
             Text(team.matchingExplanation ?? 'Based on your skills complementarity.',
@@ -193,3 +222,4 @@ class _MatchCard extends ConsumerWidget {
     );
   }
 }
+

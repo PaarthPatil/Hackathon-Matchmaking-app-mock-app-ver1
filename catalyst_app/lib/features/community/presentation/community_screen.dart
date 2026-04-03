@@ -1,22 +1,15 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:catalyst_app/models/post_model.dart';
-import 'package:catalyst_app/features/community/presentation/post_card.dart';
-import 'package:catalyst_app/features/community/data/community_repository.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'dart:io';
+import 'package:intl/intl.dart';
 
-import 'package:catalyst_app/shared/skeletons/skeleton_box.dart';
+import 'package:catalyst_app/core/services/community_api_service.dart';
+import 'package:catalyst_app/features/community/presentation/comments_screen.dart';
 import 'package:catalyst_app/shared/widgets/empty_state_widget.dart';
 import 'package:catalyst_app/shared/widgets/loading_overlay.dart';
-import 'package:flutter/services.dart';
-
-import 'package:catalyst_app/shared/widgets/animated_pressable.dart';
-import 'package:flutter_animate/flutter_animate.dart';
-import 'package:lottie/lottie.dart';
-import 'package:catalyst_app/features/community/presentation/providers/community_provider.dart';
-import 'package:catalyst_app/shared/skeletons/feature_skeletons.dart';
 
 class CommunityScreen extends ConsumerStatefulWidget {
   const CommunityScreen({super.key});
@@ -26,15 +19,21 @@ class CommunityScreen extends ConsumerStatefulWidget {
 }
 
 class _CommunityScreenState extends ConsumerState<CommunityScreen> {
+  final CommunityApiService _apiService = CommunityApiService();
   final _scrollController = ScrollController();
+  final String currentUserId = Supabase.instance.client.auth.currentUser?.id ?? '';
+
+  List<dynamic> _posts = [];
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
+    _loadPosts();
     _scrollController.addListener(() {
-      final pos = _scrollController.position;
-      if (pos.pixels >= pos.maxScrollExtent * 0.8) {
-        ref.read(communityProvider.notifier).loadMore();
+      if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent * 0.8) {
+        // Load more posts (pagination)
+        debugPrint('Load more posts...');
       }
     });
   }
@@ -43,6 +42,25 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
   void dispose() {
     _scrollController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadPosts() async {
+    try {
+      final posts = await _apiService.fetchFeed();
+      setState(() {
+        _posts = posts;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to load posts: $e')),
+        );
+      }
+    }
   }
 
   void _showCreatePost(BuildContext context) {
@@ -60,49 +78,113 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final state = ref.watch(communityProvider);
-
     return Scaffold(
-      appBar: AppBar(title: const Text('Community')),
-      body: state.isLoading 
-        ? const _CommunitySkeletonList() 
-        : RefreshIndicator(
-            onRefresh: () => ref.read(communityProvider.notifier).fetchPosts(refresh: true),
-            child: state.posts.isEmpty 
-              ? const EmptyStateWidget(
-                  icon: Icons.forum_outlined,
-                  title: 'No Posts Yet',
-                )
-              : ListView.builder(
-                  controller: _scrollController,
-                  padding: const EdgeInsets.all(16),
-                  itemCount: state.posts.length + (state.isListLoading ? 1 : 0),
-                  itemBuilder: (context, index) {
-                    if (index == state.posts.length) {
-                      if (!state.hasMore) {
-                        return const SizedBox.shrink();
-                      }
-                      return const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 16),
-                        child: PostCardSkeleton(),
-                      );
-                    }
-                    return Animate(
-                      effects: [FadeEffect(duration: 300.ms), SlideEffect(begin: const Offset(0, 0.1), duration: 300.ms)],
-                      delay: (index * 100).ms,
-                      child: PostCard(post: state.posts[index]),
-                    );
-                  },
-                ),
+      appBar: AppBar(
+        title: const Text('Community Feed'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _loadPosts,
           ),
-      floatingActionButton: AnimatedPressable(
-        onTap: () => _showCreatePost(context),
-        child: FloatingActionButton(
-          onPressed: null, // Handled by AnimatedPressable
-          child: const Icon(Icons.add),
+        ],
+      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : RefreshIndicator(
+              onRefresh: _loadPosts,
+              child: _posts.isEmpty
+                  ? const EmptyStateWidget(
+                      icon: Icons.forum_outlined,
+                      title: 'No Posts Yet',
+                    )
+                  : ListView.builder(
+                      controller: _scrollController,
+                      padding: EdgeInsets.zero,
+                      itemCount: _posts.length,
+                      itemBuilder: (context, index) {
+                        final post = _posts[index];
+                        return _PostCard(
+                          post: post,
+                          currentUserId: currentUserId,
+                          onLike: () => _handleLike(post),
+                          onComment: () => _navigateToComments(post),
+                          onDelete: () => _handleDelete(post),
+                        );
+                      },
+                    ),
+            ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _showCreatePost(context),
+        icon: const Icon(Icons.add),
+        label: const Text('New Post'),
+      ),
+    );
+  }
+
+  void _handleLike(dynamic post) async {
+    try {
+      // Optimistic UI update
+      setState(() {});
+      await _apiService.toggleLike(post['id'], true); // Default to upvote
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to like post: $e')),
+        );
+      }
+      _loadPosts(); // Reload to sync
+    }
+  }
+
+  void _navigateToComments(dynamic post) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CommentsScreen(
+          postId: post['id'],
+          postAuthorId: post['user_id'],
         ),
       ),
     );
+  }
+
+  void _handleDelete(dynamic post) async {
+    try {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Delete Post'),
+          content: const Text('Are you sure you want to delete this post?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: TextButton.styleFrom(foregroundColor: Colors.red),
+              child: const Text('Delete'),
+            ),
+          ],
+        ),
+      );
+
+      if (confirmed == true) {
+        await _apiService.deletePost(post['id']);
+        _loadPosts();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Post deleted')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to delete post: $e')),
+        );
+      }
+    }
   }
 }
 
@@ -115,6 +197,7 @@ class CreatePostBottomSheet extends ConsumerStatefulWidget {
 
 class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
   final _contentController = TextEditingController();
+  final CommunityApiService _apiService = CommunityApiService();
   File? _image;
   bool _isLoading = false;
 
@@ -126,28 +209,31 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
   }
 
   Future<void> _submit() async {
-    if (_contentController.text.isEmpty) return;
-
-    final user = Supabase.instance.client.auth.currentUser;
-    if (user == null) return;
-
-    final post = Post(
-      id: '', // Server-generated
-      userId: user.id,
-      content: _contentController.text,
-      createdAt: DateTime.now(),
-    );
+    if (_contentController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter some content')),
+      );
+      return;
+    }
 
     try {
       setState(() => _isLoading = true);
-      await ref.read(communityProvider.notifier).createPost(post);
+      
+      // Create post using new API service
+      await _apiService.createPost(_contentController.text.trim(), _image);
+      
       HapticFeedback.lightImpact();
       if (mounted) {
         Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Post created successfully!')),
+        );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error creating post: $e')),
+        );
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -188,29 +274,33 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
             ),
             const SizedBox(height: 16),
             if (_image != null) ...[
-              Image.file(_image!, height: 100),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.file(
+                  _image!,
+                  height: 100,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                ),
+              ),
               const SizedBox(height: 8),
             ],
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                AnimatedPressable(
-                  onTap: _pickImage,
-                  child: const Padding(
-                    padding: EdgeInsets.all(8.0),
-                    child: Icon(Icons.photo_library),
-                  ),
+                IconButton(
+                  icon: const Icon(Icons.photo_library),
+                  onPressed: _pickImage,
                 ),
-                AnimatedPressable(
-                  onTap: _submit,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: Colors.blue,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Text('Post', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                  ),
+                ElevatedButton(
+                  onPressed: _isLoading ? null : _submit,
+                  child: _isLoading
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Post'),
                 ),
               ],
             ),
@@ -222,17 +312,183 @@ class _CreatePostBottomSheetState extends ConsumerState<CreatePostBottomSheet> {
   }
 }
 
-class _CommunitySkeletonList extends StatelessWidget {
-  const _CommunitySkeletonList();
+class _PostCard extends StatelessWidget {
+  final dynamic post;
+  final String currentUserId;
+  final VoidCallback onLike;
+  final VoidCallback onComment;
+  final VoidCallback onDelete;
+
+  const _PostCard({
+    required this.post,
+    required this.currentUserId,
+    required this.onLike,
+    required this.onComment,
+    required this.onDelete,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: 3,
-      itemBuilder: (context, index) {
-        return const PostCardSkeleton();
-      },
+    final author = post['profiles'] as Map<String, dynamic>?;
+    final likes = (post['upvotes'] ?? 0) + (post['downvotes'] ?? 0);
+    final commentCount = 0; // Could be added from backend
+    final isOwner = post['user_id'] == currentUserId;
+
+    return Card(
+      margin: EdgeInsets.zero,
+      elevation: 0,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.zero,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header with avatar and username
+          ListTile(
+            leading: CircleAvatar(
+              backgroundColor: Colors.grey[300],
+              backgroundImage: author?['avatar_url'] != null && author!['avatar_url'].isNotEmpty
+                  ? NetworkImage(author['avatar_url'])
+                  : null,
+              child: author?['avatar_url'] == null || author!['avatar_url'].isEmpty
+                  ? Icon(Icons.person, color: Colors.grey[600])
+                  : null,
+            ),
+            title: Text(
+              author?['username'] ?? author?['name'] ?? 'Anonymous',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+              subtitle: Text(
+                _formatTime(post['created_at']),
+                style: TextStyle(color: Colors.grey[600], fontSize: 12),
+              ),
+            trailing: isOwner
+                ? IconButton(
+                    icon: const Icon(Icons.more_vert),
+                    onPressed: () => _showOptions(context),
+                  )
+                : null,
+          ),
+
+          // Post content (text)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Text(
+              post['content'],
+              style: const TextStyle(fontSize: 15),
+            ),
+          ),
+
+          // Post image (if exists)
+          if (post['image_url'] != null && post['image_url'].isNotEmpty)
+            AspectRatio(
+              aspectRatio: 1,
+              child: Image.network(
+                post['image_url'],
+                fit: BoxFit.cover,
+                width: double.infinity,
+                errorBuilder: (context, error, stackTrace) {
+                  return Container(
+                    color: Colors.grey[200],
+                    child: Center(
+                      child: Icon(Icons.broken_image, color: Colors.grey[400]),
+                    ),
+                  );
+                },
+              ),
+            ),
+
+          // Action buttons (Like, Comment)
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.favorite_border),
+                      onPressed: onLike,
+                      tooltip: 'Like',
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.chat_bubble_outline),
+                      onPressed: onComment,
+                      tooltip: 'Comment',
+                    ),
+                    const Spacer(),
+                    Text(
+                      '$likes ${likes == 1 ? 'like' : 'likes'}',
+                      style: TextStyle(color: Colors.grey[600]),
+                    ),
+                  ],
+                ),
+                if (commentCount > 0)
+                  Text(
+                    'View all $commentCount comments',
+                    style: TextStyle(color: Colors.grey[600]),
+                  ),
+              ],
+            ),
+          ),
+
+          // Divider
+          Divider(height: 1, color: Colors.grey[300]),
+        ],
+      ),
     );
+  }
+
+  void _showOptions(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.edit),
+              title: const Text('Edit Post'),
+              onTap: () {
+                Navigator.pop(context);
+                // TODO: Navigate to edit screen
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete_outline, color: Colors.red),
+              title: const Text('Delete Post', style: TextStyle(color: Colors.red)),
+              onTap: () {
+                Navigator.pop(context);
+                onDelete();
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _formatTime(String timestamp) {
+    try {
+      final dateTime = DateTime.parse(timestamp);
+      final now = DateTime.now();
+      final difference = now.difference(dateTime);
+
+      if (difference.inDays > 365) {
+        return DateFormat('MMM d, yyyy').format(dateTime);
+      } else if (difference.inDays > 30) {
+        return DateFormat('MMM d').format(dateTime);
+      } else if (difference.inDays > 0) {
+        return '${difference.inDays}d ago';
+      } else if (difference.inHours > 0) {
+        return '${difference.inHours}h ago';
+      } else if (difference.inMinutes > 0) {
+        return '${difference.inMinutes}m ago';
+      } else {
+        return 'Just now';
+      }
+    } catch (e) {
+      return 'Recently';
+    }
   }
 }

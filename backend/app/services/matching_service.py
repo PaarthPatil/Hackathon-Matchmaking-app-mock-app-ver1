@@ -5,26 +5,29 @@ from fastapi import HTTPException, status
 from app.core.cache import cache
 from app.db.supabase_client import supabase
 from app.schemas.team import RecommendationResponse
+from app.services.profile_service import ProfileService
 
 
 class MatchingService:
-    _EXPERIENCE_MAP = {
-        "beginner": 1,
-        "intermediate": 2,
-        "advanced": 3,
-    }
+    def __init__(self) -> None:
+        self._profiles = ProfileService()
 
-    def recommend_teams(self, user_id: str, hackathon_id: str) -> list[RecommendationResponse]:
+    def recommend_teams(
+        self,
+        user_id: str,
+        hackathon_id: str,
+        force_refresh: bool = False,
+    ) -> list[RecommendationResponse]:
         cache_key = f"teams:recommend:{hackathon_id}:{user_id}"
-        cached = cache.get(cache_key)
-        if isinstance(cached, list):
-            return [RecommendationResponse.model_validate(item) for item in cached]
+        if not force_refresh:
+            cached = cache.get(cache_key)
+            if isinstance(cached, list):
+                return [RecommendationResponse.model_validate(item) for item in cached]
 
         self._ensure_user_not_in_accepted_team(user_id, hackathon_id)
 
         profile = self._get_profile(user_id)
         user_skills = self._normalize_skills(profile.get("skills"))
-        user_exp = self._exp_to_num(profile.get("experience_level"))
 
         teams = (
             supabase.table("teams")
@@ -63,7 +66,7 @@ class MatchingService:
         if profile_ids:
             profile_rows = (
                 supabase.table("profiles")
-                .select("id, skills, experience_level")
+                .select("id, skills")
                 .in_("id", profile_ids)
                 .execute()
                 .data
@@ -95,39 +98,45 @@ class MatchingService:
 
             required_skills = self._normalize_skills(team.get("required_skills"))
             current_team_skills: set[str] = set()
-            member_exp_values: list[int] = []
 
             for member in team_accepted_members:
                 member_profile = member_profiles.get(member["user_id"])
                 if not member_profile:
                     continue
                 current_team_skills.update(self._normalize_skills(member_profile.get("skills")))
-                member_exp_values.append(self._exp_to_num(member_profile.get("experience_level")))
 
             matching_skills = user_skills.intersection(required_skills)
-            skill_score = (
-                (len(matching_skills) / len(required_skills)) * 100 if required_skills else 0.0
-            )
-
             missing_roles = required_skills - current_team_skills
             filled_missing_roles = user_skills.intersection(missing_roles)
-            role_score = 100.0 if filled_missing_roles else 40.0
 
-            if member_exp_values:
-                team_avg_exp = sum(member_exp_values) / len(member_exp_values)
+            if required_skills:
+                skill_score = (len(matching_skills) / len(required_skills)) * 100
+                role_score = (
+                    (len(filled_missing_roles) / len(missing_roles)) * 100
+                    if missing_roles
+                    else 70.0
+                )
             else:
-                team_avg_exp = float(user_exp)
+                # Teams with no required skills should still be shown as fallback options.
+                skill_score = 35.0
+                role_score = 35.0
 
-            experience_score = 100 - abs(float(user_exp) - float(team_avg_exp)) * 30
-            experience_score = max(0.0, min(100.0, experience_score))
+            final_score = max(0.0, min(100.0, (skill_score * 0.7) + (role_score * 0.3)))
 
-            final_score = (skill_score * 0.5) + (role_score * 0.3) + (experience_score * 0.2)
-
-            missing_role = next(iter(filled_missing_roles or missing_roles), "role")
-            explanation = (
-                f"You match {len(matching_skills)}/{len(required_skills)} required skills and fill a "
-                f"missing {missing_role}. Your experience aligns well with the team."
-            )
+            if required_skills:
+                if filled_missing_roles:
+                    highlighted_role = next(iter(filled_missing_roles))
+                    explanation = (
+                        f"You match {len(matching_skills)}/{len(required_skills)} required skills and "
+                        f"help cover missing role {highlighted_role}."
+                    )
+                else:
+                    explanation = (
+                        f"You match {len(matching_skills)}/{len(required_skills)} required skills. "
+                        "Shown as a compatibility fallback option."
+                    )
+            else:
+                explanation = "Team has open spots and no required skills listed. Shown as a fallback option."
 
             results.append(
                 RecommendationResponse(
@@ -148,21 +157,13 @@ class MatchingService:
         return results
 
     def _get_profile(self, user_id: str) -> dict:
-        rows = (
-            supabase.table("profiles")
-            .select("id, skills, experience_level")
-            .eq("id", user_id)
-            .limit(1)
-            .execute()
-            .data
-            or []
-        )
-        if not rows:
+        profile = self._profiles.get_profile(user_id=user_id)
+        if not profile:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Profile not found.",
             )
-        return rows[0]
+        return profile
 
     def _ensure_user_not_in_accepted_team(self, user_id: str, hackathon_id: str) -> None:
         rows = (
@@ -191,8 +192,3 @@ class MatchingService:
             if isinstance(skill, str) and skill.strip()
         }
         return normalized
-
-    def _exp_to_num(self, value: object) -> int:
-        if not isinstance(value, str):
-            return self._EXPERIENCE_MAP["intermediate"]
-        return self._EXPERIENCE_MAP.get(value.strip().lower(), self._EXPERIENCE_MAP["intermediate"])

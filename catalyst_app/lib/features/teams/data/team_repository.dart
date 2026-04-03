@@ -1,6 +1,4 @@
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:catalyst_app/models/team_model.dart';
-import 'package:catalyst_app/core/services/supabase_service.dart';
 import 'package:catalyst_app/core/services/api_service.dart';
 import 'package:catalyst_app/core/exceptions.dart' hide AuthException;
 
@@ -8,8 +6,6 @@ class TeamRepository {
   final ApiService _api;
 
   TeamRepository({ApiService? api}) : _api = api ?? ApiService();
-
-  SupabaseClient get _supabase => SupabaseService().client;
 
   Map<String, dynamic> _toCreateTeamPayload(Team team) {
     return {
@@ -52,9 +48,12 @@ class TeamRepository {
     }
   }
 
-  Future<List<Team>> fetchRecommendedTeams(String hackathonId) async {
+  Future<List<Team>> fetchRecommendedTeams(String hackathonId, {bool forceRefresh = false}) async {
     try {
-      final data = await _api.post('/teams/recommendations', {'hackathon_id': hackathonId});
+      final data = await _api.post('/teams/recommendations', {
+        'hackathon_id': hackathonId,
+        'force_refresh': forceRefresh,
+      });
       final items = (data is List)
           ? data
           : (data is Map<String, dynamic> && data['items'] is List
@@ -70,17 +69,15 @@ class TeamRepository {
   }
 
   // Fetch User Teams -> Supabase read is allowed
-  Future<List<Team>> fetchUserTeams(String userId) async {
+  Future<List<Team>> fetchUserTeams(String _) async {
     try {
-      final data = await _supabase
-          .from('team_members')
-          .select('*, teams(*)')
-          .eq('user_id', userId)
-          .eq('status', 'accepted');
-      
-      return (data as List).map((json) => Team.fromJson(json['teams'])).toList();
+      final data = await _api.getList('/teams/mine');
+      return data
+          .whereType<Map<String, dynamic>>()
+          .map((json) => Team.fromJson(json))
+          .toList();
     } catch (e) {
-      throw NetworkException('Failed to load your team data');
+      throw NetworkException('Failed to load your team data: $e');
     }
   }
 }

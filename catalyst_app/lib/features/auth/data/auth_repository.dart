@@ -1,5 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:catalyst_app/core/exceptions.dart' hide AuthException;
+
 import 'package:catalyst_app/core/services/supabase_service.dart';
 
 class AuthRepository {

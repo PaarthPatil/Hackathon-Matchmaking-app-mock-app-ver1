@@ -16,17 +16,19 @@ class ProfileNotifier extends StateNotifier<AsyncValue<Profile?>> {
   void _init() {
     // Listen to changes in auth status to automatically fetch profile
     _ref.listen(authProvider, (previous, next) {
-      if (next.status == AuthStatus.authenticated && next.user != null) {
-        fetchProfile(next.user!.id);
+      if (next.status == AuthStatus.authenticated) {
+        fetchProfile(next.userId);
       } else if (next.status == AuthStatus.unauthenticated) {
         state = const AsyncValue.data(null);
       }
     });
 
-    // Initial fetch if already authenticated
+    // Initial fetch only for authenticated users.
     final authState = _ref.read(authProvider);
-    if (authState.status == AuthStatus.authenticated && authState.user != null) {
-      fetchProfile(authState.user!.id);
+    if (authState.status == AuthStatus.authenticated) {
+      fetchProfile(authState.userId);
+    } else {
+      state = const AsyncValue.data(null);
     }
   }
 

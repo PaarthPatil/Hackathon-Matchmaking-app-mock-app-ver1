@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:catalyst_app/features/community/presentation/community_screen.dart';
 import 'package:catalyst_app/features/hackathons/presentation/hackathon_screen.dart';
 import 'package:catalyst_app/features/profile/presentation/profile_screen.dart';
-import 'package:catalyst_app/features/notifications/presentation/notification_screen.dart';
+
 import 'package:catalyst_app/shared/widgets/connectivity_banner.dart';
 import 'package:catalyst_app/shared/widgets/achievement_overlay.dart';
 import 'package:catalyst_app/shared/providers/achievement_provider.dart';

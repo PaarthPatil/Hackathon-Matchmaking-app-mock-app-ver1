@@ -102,7 +102,9 @@ class Profile {
       hackathonsJoined: json['hackathons_joined'] ?? 0,
       wins: json['wins'] ?? 0,
       teamsJoined: json['teams_joined'] ?? 0,
-      roles: List<String>.from(json['roles'] ?? []),
+      roles: json['roles'] != null 
+          ? List<String>.from(json['roles']) 
+          : (json['role'] != null ? [json['role'].toString()] : const []),
       availability: json['availability'] ?? 'Available',
       experienceLevel: json['experience_level'] ?? 'Beginner',
       lookingForTeam: json['looking_for_team'] ?? false,

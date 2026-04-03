@@ -14,6 +14,8 @@ from app.schemas.community import (
     CommunityFeedResponse,
     CreateCommentRequest,
     CreatePostRequest,
+    UpdateCommentRequest,
+    UpdatePostRequest,
 )
 from app.schemas.notification import NotificationCreateInternal
 from app.services.gamification_service import GamificationService
@@ -222,6 +224,86 @@ class CommunityService:
             )
 
         return {"comment_id": rows[0]["id"], "message": "Comment created successfully."}
+
+    def update_post(self, user_id: str, post_id: str, payload: UpdatePostRequest) -> dict:
+        """Update a post (only by the post owner)."""
+        post = self._get_post(post_id)
+        
+        # Verify ownership
+        if post.get("user_id") != user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You can only update your own posts.",
+            )
+
+        update_data = {}
+        if payload.content is not None:
+            update_data["content"] = payload.content
+        if payload.image_url is not None:
+            update_data["image_url"] = payload.image_url
+
+        if not update_data:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="At least one field (content or image_url) must be provided.",
+            )
+
+        response = (
+            supabase.table("posts")
+            .update(update_data)
+            .eq("id", post_id)
+            .execute()
+        )
+        
+        if not response.data:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to update post.",
+            )
+
+        return {"message": "Post updated successfully.", "post": response.data[0]}
+
+    def update_comment(self, user_id: str, comment_id: str, payload: UpdateCommentRequest) -> dict:
+        """Update a comment (only by the comment owner)."""
+        # Get the comment
+        comment_response = (
+            supabase.table("comments")
+            .select("*")
+            .eq("id", comment_id)
+            .limit(1)
+            .execute()
+        )
+        comments = comment_response.data or []
+        
+        if not comments:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Comment not found.",
+            )
+        
+        comment = comments[0]
+        
+        # Verify ownership
+        if comment.get("user_id") != user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You can only update your own comments.",
+            )
+
+        response = (
+            supabase.table("comments")
+            .update({"content": payload.content})
+            .eq("id", comment_id)
+            .execute()
+        )
+        
+        if not response.data:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to update comment.",
+            )
+
+        return {"message": "Comment updated successfully.", "comment": response.data[0]}
 
     def get_comments(self, post_id: str, limit: int, offset: int) -> CommentListResponse:
         self._get_post(post_id)

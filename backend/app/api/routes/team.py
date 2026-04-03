@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 
 from app.core.dependencies import get_current_user
 from app.schemas.team import (
@@ -11,7 +11,7 @@ from app.schemas.team import (
 from app.services.matching_service import MatchingService
 from app.services.team_service import TeamService
 
-router = APIRouter(prefix="/teams", tags=["teams"], dependencies=[Depends(get_current_user)])
+router = APIRouter(prefix="/teams", tags=["teams"])
 
 team_service = TeamService()
 matching_service = MatchingService()
@@ -59,4 +59,16 @@ def recommend_teams(payload: RecommendationRequest, current_user: dict = Depends
     return matching_service.recommend_teams(
         user_id=current_user["user_id"],
         hackathon_id=str(payload.hackathon_id),
+        force_refresh=payload.force_refresh,
+    )
+
+
+@router.get("/mine")
+def my_teams(
+    current_user: dict = Depends(get_current_user),
+    hackathon_id: str | None = Query(default=None),
+):
+    return team_service.list_user_teams(
+        user_id=current_user["user_id"],
+        hackathon_id=hackathon_id,
     )

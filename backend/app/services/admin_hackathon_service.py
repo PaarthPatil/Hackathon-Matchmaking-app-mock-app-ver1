@@ -4,6 +4,7 @@ from fastapi import HTTPException, status
 from pydantic import ValidationError
 
 from app.core.cache import cache
+from app.core.config import settings
 from app.db.supabase_client import supabase
 from app.schemas.hackathon import (
     ApproveHackathonRequest,
@@ -35,6 +36,7 @@ class AdminHackathonService:
         return {"items": rows, "limit": limit, "offset": offset, "total": int(response.count or 0)}
 
     def approve_request(self, request_id: str, payload: ApproveHackathonRequest) -> dict:
+        self._require_service_role()
         request_row = self._get_hackathon_request(request_id)
         if request_row.get("status") != "pending":
             raise HTTPException(
@@ -84,6 +86,7 @@ class AdminHackathonService:
         }
 
     def reject_request(self, request_id: str, payload: RejectHackathonRequest) -> dict:
+        self._require_service_role()
         request_row = self._get_hackathon_request(request_id)
         if request_row.get("status") != "pending":
             raise HTTPException(
@@ -141,6 +144,7 @@ class AdminHackathonService:
         return {"message": "Hackathon request rejected."}
 
     def create_hackathon(self, payload: CreateHackathonRequest) -> dict:
+        self._require_service_role()
         self._ensure_hackathon_not_duplicate(payload.title, payload.organizer)
         insert_payload = payload.model_dump()
 
@@ -159,6 +163,7 @@ class AdminHackathonService:
         }
 
     def update_hackathon(self, hackathon_id: str, payload: UpdateHackathonRequest) -> dict:
+        self._require_service_role()
         existing = self._get_hackathon(hackathon_id)
         updates = payload.model_dump(exclude_unset=True)
         if not updates:
@@ -208,6 +213,7 @@ class AdminHackathonService:
         return {"message": "Hackathon updated successfully."}
 
     def delete_hackathon(self, hackathon_id: str) -> dict:
+        self._require_service_role()
         self._get_hackathon(hackathon_id)
 
         teams = (
@@ -337,3 +343,14 @@ class AdminHackathonService:
     def _invalidate_hackathon_cache(self, hackathon_id: str) -> None:
         cache.invalidate_prefix("hackathons:list:")
         cache.invalidate_prefix(f"hackathons:detail:{hackathon_id}")
+
+    def _require_service_role(self) -> None:
+        if settings.has_service_role_key:
+            return
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=(
+                "Admin write actions require SUPABASE_SERVICE_ROLE_KEY configured "
+                "with role=service_role."
+            ),
+        )

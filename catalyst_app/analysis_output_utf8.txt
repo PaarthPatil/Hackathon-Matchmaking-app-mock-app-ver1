@@ -1,0 +1,22 @@
+﻿Analyzing catalyst_app...                                       
+
+   info - 'value' is deprecated and shouldn't be used. Use initialValue instead. This will set the initial value for the form field. This feature was deprecated after v3.33.0-1.0.pre - lib\features\admin\presentation\admin_dashboard_screen.dart:211:33 - deprecated_member_use
+   info - 'value' is deprecated and shouldn't be used. Use initialValue instead. This will set the initial value for the form field. This feature was deprecated after v3.33.0-1.0.pre - lib\features\admin\presentation\admin_dashboard_screen.dart:267:33 - deprecated_member_use
+   info - 'value' is deprecated and shouldn't be used. Use initialValue instead. This will set the initial value for the form field. This feature was deprecated after v3.33.0-1.0.pre - lib\features\admin\presentation\admin_dashboard_screen.dart:338:33 - deprecated_member_use
+   info - 'value' is deprecated and shouldn't be used. Use initialValue instead. This will set the initial value for the form field. This feature was deprecated after v3.33.0-1.0.pre - lib\features\admin\presentation\admin_dashboard_screen.dart:353:33 - deprecated_member_use
+  error - The method 'AuthException' isn't defined for the type 'ChatRepository' - lib\features\chat\data\chat_repository.dart:61:31 - undefined_method
+
+flutter : 5 issues found. (ran in 
+6.1s)
+At line:1 char:18
++ cd catalyst_app; flutter analyze > 
+analysis_output.txt 2>&1
++                  ~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpe 
+   cified: (5 issues found. (ran in  
+   6.1s):String) [], RemoteExcepti   
+ on
+    + FullyQualifiedErrorId : Native 
+   CommandError
+ 

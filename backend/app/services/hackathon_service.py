@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 from fastapi import HTTPException, status
 from pydantic import ValidationError
 
@@ -10,6 +12,8 @@ from app.schemas.hackathon import (
     HackathonListResponse,
     HackathonRequestCreate,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class HackathonService:
@@ -81,6 +85,13 @@ class HackathonService:
         response = query.execute()
         rows = response.data or []
         total = int(response.count or 0)
+        logger.info(
+            "Hackathons fetched | page=%s page_size=%s rows=%s total=%s",
+            page,
+            page_size,
+            len(rows),
+            total,
+        )
 
         try:
             items = [HackathonListItem.model_validate(row) for row in rows]
@@ -113,6 +124,7 @@ class HackathonService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Hackathon not found",
             )
+        logger.info("Hackathon detail fetched | hackathon_id=%s", hackathon_id)
 
         try:
             result = HackathonListItem.model_validate(rows[0])

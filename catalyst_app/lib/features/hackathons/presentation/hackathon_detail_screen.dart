@@ -59,7 +59,7 @@ class HackathonDetailScreen extends ConsumerWidget {
         userTeamAsync.when(
           data: (teamId) => _buildBottomBar(context, h, teamId, isEnded),
           loading: () => const SizedBox(height: 80, child: Center(child: CircularProgressIndicator())),
-          error: (_, __) => _buildBottomBar(context, h, null, isEnded),
+          error: (error, stackTrace) => _buildBottomBar(context, h, null, isEnded),
         ),
       ],
     );

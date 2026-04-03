@@ -86,7 +86,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             if (!isMember) {
               WidgetsBinding.instance.addPostFrameCallback((_) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Access Denied: You are not a member of this team')),
+                  const SnackBar(content: Text('Access denied: only accepted team members can access chat.')),
                 );
                 context.pop();
               });

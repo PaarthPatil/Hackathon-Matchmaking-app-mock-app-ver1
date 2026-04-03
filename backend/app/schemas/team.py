@@ -25,6 +25,7 @@ class JoinTeamRequest(BaseModel):
 
 class RecommendationRequest(BaseModel):
     hackathon_id: UUID
+    force_refresh: bool = False
 
 
 class TeamMemberActionRequest(BaseModel):

@@ -1,51 +1,57 @@
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:catalyst_app/models/notification_model.dart';
 import 'package:catalyst_app/core/services/api_service.dart';
-import 'package:catalyst_app/core/services/supabase_service.dart';
-import 'package:catalyst_app/core/exceptions.dart';
+import 'package:catalyst_app/core/exceptions.dart' hide AuthException;
 
 class NotificationRepository {
   final ApiService _api;
 
   NotificationRepository({ApiService? api}) : _api = api ?? ApiService();
 
-  SupabaseClient get _supabase => SupabaseService().client;
-
-  // READ via Supabase is allowed
+  // READ via backend API to avoid direct Supabase access from Flutter.
   Future<List<NotificationModel>> fetchNotifications(
-    String userId, {
+    String _, {
     int limit = 20,
     int offset = 0,
   }) async {
     try {
-      final data = await _supabase
-          .from('notifications')
-          .select()
-          .eq('user_id', userId)
-          .range(offset, offset + limit - 1)
-          .order('created_at', ascending: false);
-      
-      return (data as List).map((json) => NotificationModel.fromJson(json)).toList();
+      final data = await _api.getList(
+        '/notifications',
+        queryParameters: {
+          'limit': limit,
+          'offset': offset,
+        },
+      );
+      return data
+          .whereType<Map<String, dynamic>>()
+          .map((json) => NotificationModel.fromJson(json))
+          .toList();
     } catch (e) {
-      throw NetworkException('Failed to fetch notifications');
+      throw NetworkException('Failed to fetch notifications: $e');
     }
   }
 
-  // LISTEN via Supabase Realtime is allowed exception in ph17
+  // Poll backend periodically to avoid direct Supabase subscriptions in Flutter.
   Stream<List<NotificationModel>> subscribeNotifications() {
-    final user = _supabase.auth.currentUser;
-    if (user == null) return const Stream.empty();
+    return Stream<List<NotificationModel>>.multi((controller) {
+      var cancelled = false;
+      controller.onCancel = () {
+        cancelled = true;
+      };
 
-    try {
-      return _supabase
-          .from('notifications')
-          .stream(primaryKey: ['id'])
-          .eq('user_id', user.id)
-          .order('created_at', ascending: false)
-          .map((data) => data.map((json) => NotificationModel.fromJson(json)).toList());
-    } catch (e) {
-      throw NetworkException('Notification service connection failed');
-    }
+      Future<void> tick() async {
+        while (!cancelled) {
+          try {
+            final items = await fetchNotifications('', limit: 50, offset: 0);
+            controller.add(items);
+          } catch (e) {
+            controller.addError(NetworkException('Notification service connection failed: $e'));
+          }
+          await Future<void>.delayed(const Duration(seconds: 5));
+        }
+      }
+
+      tick();
+    });
   }
 
   // MARK AS READ (Logic Rule 17) via Python API

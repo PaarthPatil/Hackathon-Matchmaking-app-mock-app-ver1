@@ -9,9 +9,9 @@ class CatalystException implements Exception {
 }
 
 class AuthException extends CatalystException {
-  AuthException(String message) : super(message);
+  AuthException(super.message);
 }
 
 class NetworkException extends CatalystException {
-  NetworkException(String message) : super(message);
+  NetworkException(super.message);
 }

@@ -6,7 +6,7 @@ import 'package:catalyst_app/features/teams/presentation/providers/team_provider
 import 'package:catalyst_app/features/auth/presentation/providers/auth_provider.dart';
 import 'package:catalyst_app/shared/widgets/loading_overlay.dart';
 import 'package:catalyst_app/shared/widgets/animated_pressable.dart';
-import 'package:catalyst_app/features/hackathons/presentation/providers/hackathon_provider.dart';
+
 import 'package:flutter/services.dart';
 
 class CreateTeamScreen extends ConsumerStatefulWidget {
@@ -100,14 +100,14 @@ class _CreateTeamScreenState extends ConsumerState<CreateTeamScreen> {
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
-              value: _commitment,
+            initialValue: _commitment,
               decoration: const InputDecoration(labelText: 'Commitment Level'),
               items: ['Full', 'Medium', 'Low'].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
               onChanged: (v) => setState(() => _commitment = v!),
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
-              value: _availability,
+            initialValue: _availability,
               decoration: const InputDecoration(labelText: 'Availability'),
               items: ['Weekends', 'Evenings', 'Anytime'].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
               onChanged: (v) => setState(() => _availability = v!),
